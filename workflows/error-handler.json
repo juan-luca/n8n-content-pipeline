@@ -1,0 +1,147 @@
+{
+  "id": "cpErrorHandler01",
+  "name": "Content pipeline: error handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5853a67a-f496-5109-a098-89b295201914",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "59cc950f-fbb9-5bd9-80f3-a60d8dbbfca6",
+              "leftValue": "={{ $json.execution?.error?.message ?? '' }}",
+              "rightValue": "[handled]",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ea1351ce-aa30-512f-be0a-75bd67b72e04",
+      "name": "Already alerted by the pipeline?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c0eae354-05d6-5e2b-9054-33a74bb53267",
+      "name": "Nothing else to do",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        480,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_ALERT_CHANNEL, text: '🚨 *Unexpected error* in ' + $json.workflow.name + '\\nLast node: ' + ($json.execution.lastNodeExecuted || 'unknown') + '\\nError: ' + ($json.execution.error?.message || 'unknown') + '\\n<' + ($json.execution.url || '') + '|Open the execution in n8n>' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7a283207-f670-5c1d-bc77-601b83a01a91",
+      "name": "Slack: alert ops (unexpected error)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## Safety net\nRuns when the content pipeline fails in a way it did not handle itself. Handled failures are already in Notion and #ops-alerts, so they are skipped here to avoid double alerts.",
+        "height": 180,
+        "width": 760,
+        "color": 3
+      },
+      "id": "08258000-c1fe-56ae-9496-c1888dcb450c",
+      "name": "Note error",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Already alerted by the pipeline?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already alerted by the pipeline?": {
+      "main": [
+        [
+          {
+            "node": "Nothing else to do",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: alert ops (unexpected error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {},
+  "tags": []
+}

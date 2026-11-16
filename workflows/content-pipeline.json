@@ -1,0 +1,2278 @@
+{
+  "id": "cpMainPipeline01",
+  "name": "Content pipeline: request → AI draft → human review → schedule",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "new-content-request",
+        "formTitle": "New content request",
+        "formDescription": "Account managers: describe the piece you need. The AI writes a first draft and sends it to #content-review for approval.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Client (restaurant or brand)",
+              "fieldName": "client",
+              "requiredField": true,
+              "placeholder": "Casa Lupita"
+            },
+            {
+              "fieldLabel": "Platform",
+              "fieldName": "platform",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Instagram"
+                  },
+                  {
+                    "option": "TikTok"
+                  },
+                  {
+                    "option": "Facebook"
+                  },
+                  {
+                    "option": "LinkedIn"
+                  },
+                  {
+                    "option": "X"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Content type",
+              "fieldName": "content_type",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Post caption"
+                  },
+                  {
+                    "option": "Reel or TikTok script"
+                  },
+                  {
+                    "option": "Story text"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Brief",
+              "fieldName": "brief",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "New weekend brunch menu: chilaquiles verdes and churro French toast, launches Saturday"
+            },
+            {
+              "fieldLabel": "Tone",
+              "fieldName": "tone",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Warm & friendly"
+                  },
+                  {
+                    "option": "Premium"
+                  },
+                  {
+                    "option": "Playful"
+                  },
+                  {
+                    "option": "Informative"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Publish date",
+              "fieldName": "publish_at",
+              "fieldType": "date"
+            },
+            {
+              "fieldLabel": "Words to avoid (comma-separated)",
+              "fieldName": "avoid",
+              "placeholder": "cheap, best in town"
+            },
+            {
+              "fieldLabel": "Your name",
+              "fieldName": "requested_by"
+            }
+          ]
+        },
+        "options": {
+          "path": "new-content-request",
+          "buttonLabel": "Send request",
+          "appendAttribution": false
+        }
+      },
+      "id": "62954730-386b-5cc9-9588-1befb0b621ee",
+      "name": "New content request (form)",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "70623ec8-029f-5e96-a01e-6cd62d558da5"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "14e0c98e-0dbd-57ed-b065-cbb053f8445f",
+      "name": "Called by the API intake",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "53357b94-0190-5c12-aceb-dc414dbad5dc",
+              "name": "request_id",
+              "value": "={{ $json.request_id || ('CR-' + $now.toFormat('yyyyMMdd') + '-' + $execution.id) }}",
+              "type": "string"
+            },
+            {
+              "id": "8800c522-d8a3-5174-a5cc-f23fb7727a0e",
+              "name": "source",
+              "value": "={{ $json.source || 'form' }}",
+              "type": "string"
+            },
+            {
+              "id": "bf3b2c41-5c84-55fb-8199-99c40ecf9e05",
+              "name": "client",
+              "value": "={{ String($json.client ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "c1eec17d-5777-5945-a90f-c386cb85b84a",
+              "name": "platform",
+              "value": "={{ String($json.platform ?? '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "a580e788-3e32-5adf-ba9a-4291fd6f1dc2",
+              "name": "content_type",
+              "value": "={{ $json.content_type || 'Post caption' }}",
+              "type": "string"
+            },
+            {
+              "id": "b740ff7a-c088-533f-9aa7-7554258d32e4",
+              "name": "brief",
+              "value": "={{ String($json.brief ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "2b4e99f8-878d-51e0-93f9-cf1f1a1c4905",
+              "name": "tone",
+              "value": "={{ $json.tone || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "0323ff06-5dc5-5d94-b370-d1d4721b0579",
+              "name": "publish_at",
+              "value": "={{ ($json.publish_at || $now.plus({ days: 2 }).toISODate()) }}",
+              "type": "string"
+            },
+            {
+              "id": "e1708c7b-1cd6-51c9-bc1d-379dd2f6c57d",
+              "name": "days_to_publish",
+              "value": "={{ Math.round(DateTime.fromISO(($json.publish_at || $now.plus({ days: 2 }).toISODate())).startOf('day').diff($now.startOf('day'), 'days').days) }}",
+              "type": "number"
+            },
+            {
+              "id": "43ee8f0e-5151-5f3b-a803-2ff866fd9be1",
+              "name": "priority",
+              "value": "={{ Math.round(DateTime.fromISO(($json.publish_at || $now.plus({ days: 2 }).toISODate())).startOf('day').diff($now.startOf('day'), 'days').days) <= (Number($env.URGENT_WITHIN_DAYS) || 2) ? 'Urgent' : 'Normal' }}",
+              "type": "string"
+            },
+            {
+              "id": "c3e023ce-0d30-54fb-8f16-c39199efc82e",
+              "name": "avoid",
+              "value": "={{ String($json.avoid ?? '').split(',').map(w => w.trim()).filter(w => w) }}",
+              "type": "array"
+            },
+            {
+              "id": "8a03cf45-8a93-5c4d-a9f9-00a3281ffb02",
+              "name": "requested_by",
+              "value": "={{ $json.requested_by || 'account manager' }}",
+              "type": "string"
+            },
+            {
+              "id": "6ef4c397-e0c4-5fa9-ae70-579c6159af8a",
+              "name": "review_timeout_minutes",
+              "value": "={{ Math.max(1, Number($json.review_timeout_minutes) || Number($env.APPROVAL_TIMEOUT_MINUTES) || 2880) }}",
+              "type": "number"
+            },
+            {
+              "id": "e30d1978-4e09-5ed0-b048-562d23e2838e",
+              "name": "revision",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "8b8b7d3d-d55a-51d7-986e-13ab09a3eb41",
+              "name": "feedback",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "5e9253a0-1541-5d89-969b-1dead854a6ca",
+              "name": "format_retries",
+              "value": "={{ 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "0a003891-4d0f-5956-98b9-d4a06a9b71bc",
+              "name": "received_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "37e26b08-4c7b-5d8c-835f-6acf8af9460a",
+      "name": "Normalize request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTION_API_BASE }}/pages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  parent: { database_id: $env.NOTION_DATABASE_ID },\n  properties: {\n    'Name': { title: [{ text: { content: $json.client + ' · ' + $json.platform + ' · ' + $json.content_type } }] },\n    'Request ID': { rich_text: [{ text: { content: String($json.request_id).slice(0, 1900) } }] },\n    'Client': { rich_text: [{ text: { content: String($json.client).slice(0, 1900) } }] },\n    'Platform': { select: { name: $json.platform } },\n    'Status': { select: { name: 'Drafting' } },\n    'Priority': { select: { name: $json.priority } },\n    'Publish date': { date: { start: $json.publish_at } },\n    'Requested by': { rich_text: [{ text: { content: String($json.requested_by).slice(0, 1900) } }] },\n    'Revision': { number: 0 }\n  }\n}) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "dd10e134-48af-569d-88e1-2b4cbc74bf76",
+      "name": "Notion: create tracker page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Normalize request').first().json, notion_page_id: $json.id, notion_url: $json.url }) }}",
+        "options": {}
+      },
+      "id": "2aa2ae35-d683-5143-96cb-84cafe05e2d3",
+      "name": "Save tracker page id",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTION_API_BASE }}/databases/{{ $env.NOTION_CLIENTS_DATABASE_ID }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Name', title: { equals: $json.client } }, page_size: 1 }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "81805ef1-b049-5a8a-b202-dfb09b9a963a",
+      "name": "Notion: look up the client profile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify((() => {\n  const base = $('Save tracker page id').first().json;\n  const page = $json.error ? null : ($json.results || [])[0];\n  const prop = (k) => (page && page.properties && page.properties[k]) || {};\n  const text = (k) => (prop(k).title || prop(k).rich_text || []).map((t) => t.plain_text ?? (t.text && t.text.content) ?? '').join('').trim();\n  const list = (s) => s.split(',').map((w) => w.trim()).filter((w) => w);\n  const avoid = base.avoid.concat(page ? list(text('Words to avoid')) : []).map((w) => w.toLowerCase());\n  return Object.assign({}, base, {\n    profile_status: page ? 'found' : ($json.error ? 'unavailable' : 'none'),\n    brand_voice: page ? text('Brand voice') : '',\n    required_hashtags: page ? list(text('Hashtags')) : [],\n    sign_off: page ? text('Sign-off') : '',\n    account_manager: (page && text('Account manager')) || base.requested_by,\n    tone: base.tone || (prop('Default tone').select && prop('Default tone').select.name) || 'Warm & friendly',\n    avoid: avoid.filter((w, i) => avoid.indexOf(w) === i)\n  });\n})()) }}",
+        "options": {}
+      },
+      "id": "dd68b9b4-f3a0-51d1-813e-9d8b17b67786",
+      "name": "Apply client profile",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0aa4dcb1-34f0-5da8-a989-5b7dbdf18da1",
+              "name": "drafting_started_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "dc7acf92-629b-58fc-9ff5-cf9ee8e06ec2",
+      "name": "Draft state",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LLM_BASE_URL }}/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: $env.LLM_MODEL,\n  temperature: 0.7,\n  response_format: { type: 'json_object' },\n  messages: [\n    { role: 'system', content: \"You write social media copy for restaurants and hospitality brands. Write in the requested tone, for the requested platform and content type, following the client's brand_voice when it is given. Never use any of the words_to_avoid. Always include the required_hashtags, and end the caption with the sign_off when it is given. If feedback is present, rewrite the previous draft to address it. Reply with a JSON object only, with these keys: hook, caption, hashtags (array of strings), call_to_action, alt_text, visual_direction, revision_note.\" },\n    { role: 'user', content: JSON.stringify({\n        client: $json.client, platform: $json.platform, content_type: $json.content_type, brief: $json.brief,\n        tone: $json.tone, brand_voice: $json.brand_voice, words_to_avoid: $json.avoid,\n        required_hashtags: $json.required_hashtags, sign_off: $json.sign_off, publish_date: $json.publish_at,\n        revision: $json.revision, feedback: $json.feedback, format_note: $json.format_note || '' }) }\n  ]\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "614d3cb7-d3cf-5e12-9fc4-3ac875ef3699",
+      "name": "LLM: write the draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredLlmKey0001",
+          "name": "LLM API key"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Draft state').first().json, draft: JSON.parse($json.choices[0].message.content) }) }}",
+        "options": {}
+      },
+      "id": "a5be4ec6-2897-5557-9403-9cfc480df9cf",
+      "name": "Parse the draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35b5765e-a386-55c3-a8bb-a1f725256be7",
+              "leftValue": "={{ $json.draft.caption }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "94627751-80f3-5677-a9ba-fc2c67ce09c8",
+              "leftValue": "={{ Array.isArray($json.draft.hashtags) && $json.draft.hashtags.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d8e80030-f0b6-5ce1-80ae-a2ca62fb3b47",
+      "name": "Draft has caption and hashtags?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bc36ccde-9fd7-5c34-9219-f442f6dd7aa3",
+              "leftValue": "={{ $('Draft state').first().json.format_retries }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3e74bd5d-172e-5a82-bc73-f54f0a6b3ce0",
+      "name": "One more try for valid JSON?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Draft state').first().json, format_retries: $('Draft state').first().json.format_retries + 1, format_note: 'Your previous reply was not a valid JSON object with caption and hashtags. Reply with the JSON object only.' }) }}",
+        "options": {}
+      },
+      "id": "5d86661b-4c62-5fce-8fdc-ae22b739f6b8",
+      "name": "Ask again for valid JSON",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4597221c-00ca-51c6-b88b-a3bc39147ad4",
+              "name": "full_text",
+              "value": "={{ ($json.draft.caption + '\\n\\n' + $json.draft.hashtags.join(' ')) }}",
+              "type": "string"
+            },
+            {
+              "id": "39c1b5a0-cff9-5054-811d-9b56104123b4",
+              "name": "char_limit",
+              "value": "={{ ({ instagram: 2200, tiktok: 2200, facebook: 5000, linkedin: 3000, x: 280 })[$json.platform] || 2200 }}",
+              "type": "number"
+            },
+            {
+              "id": "6022dc21-646a-54cb-aef9-0aa2e5aad613",
+              "name": "char_count",
+              "value": "={{ ($json.draft.caption + '\\n\\n' + $json.draft.hashtags.join(' ')).length }}",
+              "type": "number"
+            },
+            {
+              "id": "f519d685-081f-5ea4-96c6-5f5ba6e596ee",
+              "name": "hashtag_limit",
+              "value": "={{ ({ instagram: 30, x: 3 })[$json.platform] || 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "1ba5e8f3-eeee-5873-b509-1e4d196cc2e8",
+              "name": "hashtag_count",
+              "value": "={{ $json.draft.hashtags.length }}",
+              "type": "number"
+            },
+            {
+              "id": "85764757-c970-5a02-9cab-6773b3705869",
+              "name": "avoided_words_found",
+              "value": "={{ $json.avoid.filter(w => ($json.draft.caption + '\\n\\n' + $json.draft.hashtags.join(' ')).toLowerCase().includes(w.toLowerCase())) }}",
+              "type": "array"
+            },
+            {
+              "id": "e31c364b-cd7f-5a3a-b913-2eb2e2e515cc",
+              "name": "missing_hashtags",
+              "value": "={{ ($json.required_hashtags || []).filter(h => !$json.draft.hashtags.map(x => String(x).toLowerCase()).includes(String(h).toLowerCase())) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8b236ba0-7729-5227-8a02-9ef959322a8b",
+      "name": "Run brand checks",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d537faa6-7cc7-53fe-83d9-7eb60b243c27",
+              "name": "checks_passed",
+              "value": "={{ $json.char_count <= $json.char_limit && $json.hashtag_count <= $json.hashtag_limit && $json.avoided_words_found.length === 0 && $json.missing_hashtags.length === 0 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "dfd8274c-c80d-5859-863d-65a71a10c6d5",
+              "name": "checks_summary",
+              "value": "={{ [\n  ($json.char_count <= $json.char_limit ? '✅' : '⚠️') + ' Length: ' + $json.char_count + '/' + $json.char_limit + ' characters',\n  ($json.hashtag_count <= $json.hashtag_limit ? '✅' : '⚠️') + ' Hashtags: ' + $json.hashtag_count + '/' + $json.hashtag_limit,\n  $json.avoided_words_found.length ? '⚠️ Words to avoid found: ' + $json.avoided_words_found.join(', ') : '✅ No words from the avoid list',\n  ($json.required_hashtags || []).length ? ($json.missing_hashtags.length ? '⚠️ Missing client hashtags: ' + $json.missing_hashtags.join(', ') : '✅ Client hashtags included') : ''\n].filter(l => l).join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "805c4249-99df-5b7c-bb81-2bee398e25b9",
+      "name": "Summarize brand checks",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NOTION_API_BASE }}/pages/{{ $('Save tracker page id').first().json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: {\n    'Status': { select: { name: 'In review' } },\n    'Revision': { number: $json.revision },\n    'Review requested': { date: { start: $now.toISO() } },\n    'Caption': { rich_text: [{ text: { content: String($json.full_text).slice(0, 1900) } }] },\n    'Brand checks': { rich_text: [{ text: { content: String($json.checks_summary).slice(0, 1900) } }] }\n} }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "c0a504e4-041d-52f1-8f0c-3d11e0c80f45",
+      "name": "Notion: mark In review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_REVIEW_CHANNEL, text: ((C) => '*Review needed* · ' + C.client + ' · ' + C.platform + ' · ' + C.content_type + (C.revision ? ' · revision ' + C.revision : '') + '\\n' + 'Request ' + C.request_id + ' · publish ' + C.publish_at + ' (' + (C.days_to_publish === -1 ? '1 day late' : C.days_to_publish < 0 ? (-C.days_to_publish) + ' days late' : C.days_to_publish === 0 ? 'today' : C.days_to_publish === 1 ? 'tomorrow' : 'in ' + C.days_to_publish + ' days') + ')' + (C.priority === 'Urgent' ? ' · 🔥 *Urgent*' : '') + (C.feedback ? '\\nLast feedback: ' + C.feedback : '') + '\\n\\n' + C.full_text + '\\n\\n*Brand checks*\\n' + C.checks_summary + '\\n' + ({ found: 'ℹ️ Client profile applied: brand voice, words to avoid, hashtags', none: 'ℹ️ No client profile for ' + C.client + ': drafted from the request only', unavailable: '⚠️ Client profile unavailable (Notion error): drafted from the request only' })[C.profile_status] + '\\n\\n' + '<' + $execution.resumeFormUrl + '|Open the review form> to approve, request changes or reject.')($('Summarize brand checks').first().json) }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "eac85700-5635-56ed-86df-d34b291a3b89",
+      "name": "Slack: send draft for review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9ffa3134-06cd-5e5b-b436-ada51ecc1873",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "07df23a5-70ec-581e-9e73-445dd7a1e1aa",
+      "name": "Slack accepted it?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formTitle": "=Review: {{ $('Summarize brand checks').first().json.client }} · {{ $('Summarize brand checks').first().json.platform }}",
+        "formDescription": "={{ $('Summarize brand checks').first().json.full_text }}\n\n{{ $('Summarize brand checks').first().json.checks_summary }}",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Approve"
+                  },
+                  {
+                    "option": "Request changes"
+                  },
+                  {
+                    "option": "Reject"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Feedback",
+              "fieldType": "textarea",
+              "placeholder": "What should change? (needed for 'Request changes')"
+            },
+            {
+              "fieldLabel": "Reviewer",
+              "placeholder": "Your name"
+            }
+          ]
+        },
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ $('Normalize request').first().json.review_timeout_minutes }}",
+        "resumeUnit": "minutes",
+        "options": {}
+      },
+      "id": "88829abb-ea79-58b5-ac88-fcea29bde902",
+      "name": "Wait for the review",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3600,
+        280
+      ],
+      "webhookId": "5843f990-d108-5b9c-abb7-c6c635bea60c"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "15dc4763-0d63-50be-9371-f167f04c74ae",
+                    "leftValue": "={{ $json.Decision }}",
+                    "rightValue": "Approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approve"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "327836af-7b33-5d42-abba-145e2191ee1c",
+                    "leftValue": "={{ $json.Decision }}",
+                    "rightValue": "Request changes",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Request changes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "70736594-7809-5cdd-ad96-c47f5df111ee",
+                    "leftValue": "={{ $json.Decision }}",
+                    "rightValue": "Reject",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Reject"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer in time"
+        }
+      },
+      "id": "510219a9-6a83-5954-8ca1-dda31b994b9e",
+      "name": "Route the decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        3840,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PUBLISHER_API_BASE }}/posts",
+        "authentication": "none",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ platform: $('Summarize brand checks').first().json.platform, text: $('Summarize brand checks').first().json.full_text, scheduled_at: $('Summarize brand checks').first().json.publish_at, client: $('Summarize brand checks').first().json.client, external_id: $('Summarize brand checks').first().json.request_id }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "3f362b46-fe1b-5a6c-a2ad-5e357769f0e4",
+      "name": "Publisher: schedule the post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4080,
+        60
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NOTION_API_BASE }}/pages/{{ $('Save tracker page id').first().json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: {\n    'Status': { select: { name: 'Scheduled' } },\n    'Post ID': { rich_text: [{ text: { content: String($json.id).slice(0, 1900) } }] },\n    'Approved by': { rich_text: [{ text: { content: String($('Wait for the review').first().json.Reviewer || 'reviewer').slice(0, 1900) } }] }\n} }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "d421aaae-daa6-5a3e-9ec3-084a01d275b9",
+      "name": "Notion: mark Scheduled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4320,
+        60
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_REVIEW_CHANNEL, text: '✅ *Scheduled* · ' + $('Summarize brand checks').first().json.client + ' · ' + $('Summarize brand checks').first().json.platform + ' · ' + $('Summarize brand checks').first().json.publish_at + '\\nApproved by ' + ($('Wait for the review').first().json.Reviewer || 'reviewer') + ' · request ' + $('Summarize brand checks').first().json.request_id + ' · post ' + $('Publisher: schedule the post').first().json.id }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "77baa721-31a6-5b9c-a5ca-005ad1acb6b4",
+      "name": "Slack: confirm it is scheduled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4560,
+        60
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ceac95fc-cdf6-5cfb-9c71-33d1be99c018",
+              "leftValue": "={{ $('Draft state').first().json.revision }}",
+              "rightValue": "={{ Number($env.MAX_REVISIONS) || 2 }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c29da485-d027-5388-aeca-85495bebf19e",
+      "name": "Revisions left?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$('Draft state').first().json, revision: $('Draft state').first().json.revision + 1, format_retries: 0, format_note: '', feedback: $('Wait for the review').first().json.Feedback || 'Please improve the draft.' }) }}",
+        "options": {}
+      },
+      "id": "cb975e28-03a7-59e1-8e1e-09af7ea63482",
+      "name": "Apply reviewer feedback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8e2f61df-d743-59c2-9ee6-051d59be8c39",
+              "name": "reason",
+              "value": "={{ 'Still not approved after ' + $('Draft state').first().json.revision + ' revisions' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "32775d20-bab0-553d-800e-1b14057fb8a1",
+      "name": "Too many revisions",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4320,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "830dec35-4049-5eab-b8a7-f6d83ae6ea82",
+              "name": "reason",
+              "value": "={{ 'Nobody reviewed it within ' + $('Normalize request').first().json.review_timeout_minutes + ' minutes' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "dfbabe8f-5cdb-590f-bf35-a9b100e02c88",
+      "name": "No review in time",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4320,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NOTION_API_BASE }}/pages/{{ $('Save tracker page id').first().json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { 'Status': { select: { name: 'Needs attention' } }, 'Notes': { rich_text: [{ text: { content: String($json.reason).slice(0, 1900) } }] } } }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "a13c1b97-f444-5387-ba9c-46977315d651",
+      "name": "Notion: mark Needs attention",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4560,
+        540
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_REVIEW_CHANNEL, text: '⏳ *Needs attention* · ' + $('Normalize request').first().json.client + ' · ' + $('Normalize request').first().json.platform + '\\n' + ($('Too many revisions').isExecuted ? $('Too many revisions').first().json.reason : $('No review in time').first().json.reason) + ' · request ' + $('Normalize request').first().json.request_id + '\\n' + ($('Draft state').first().json.account_manager || $('Normalize request').first().json.requested_by) + ', can you take it from here?' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "984988d3-e4d8-5d4e-a613-5e8421607d2d",
+      "name": "Slack: ask the account manager",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4800,
+        540
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NOTION_API_BASE }}/pages/{{ $('Save tracker page id').first().json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { 'Status': { select: { name: 'Rejected' } }, 'Notes': { rich_text: [{ text: { content: String($json.Feedback || 'Rejected without comment').slice(0, 1900) } }] } } }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "1be0fa65-a498-5522-a418-46d7d2972f31",
+      "name": "Notion: mark Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4080,
+        800
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_REVIEW_CHANNEL, text: '❌ *Rejected* · ' + $('Normalize request').first().json.client + ' · request ' + $('Normalize request').first().json.request_id + '\\nReason: ' + ($('Wait for the review').first().json.Feedback || 'no comment') }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "291b8d7a-0b28-50df-9b0a-cb97b75b478c",
+      "name": "Slack: note the rejection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4320,
+        800
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fc0c01cd-73b8-5f4b-9482-17aa404fa21f",
+              "name": "failure_step",
+              "value": "Create tracker page in Notion",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "181bc712-33c1-55ba-a4e0-e5b9dfd534a3",
+      "name": "Fail: tracker page",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1c39050e-46c4-5fa8-a81e-160d2dcc16fa",
+              "name": "failure_step",
+              "value": "AI draft",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "b512fe92-e606-5179-8e19-a2dd3654ca63",
+      "name": "Fail: AI draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1c39050e-46c4-5fa8-a81e-160d2dcc16fa",
+              "name": "failure_step",
+              "value": "AI draft",
+              "type": "string"
+            },
+            {
+              "id": "8cd78403-397e-5809-b1fc-e6bf9d541c48",
+              "name": "failure_detail",
+              "value": "={{ 'The model did not return a valid draft after a retry' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "6d438653-b3d6-56ba-b3f4-7ea3ecfe1d38",
+      "name": "Fail: no valid draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a9dbc3e9-2d02-59c3-9c7a-61f02a3deaa0",
+              "name": "failure_step",
+              "value": "Update tracker in Notion",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "c5657974-676c-55fc-86a9-6b331b16925a",
+      "name": "Fail: tracker update",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20b6612b-0710-5055-ab35-8cb042fc9d46",
+              "name": "failure_step",
+              "value": "Send draft to Slack",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "0dd7abe8-c9cc-5aad-a361-61227561ad5f",
+      "name": "Fail: Slack unreachable",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3360,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20b6612b-0710-5055-ab35-8cb042fc9d46",
+              "name": "failure_step",
+              "value": "Send draft to Slack",
+              "type": "string"
+            },
+            {
+              "id": "732dd023-a8be-59d4-80ff-38bef462c985",
+              "name": "failure_detail",
+              "value": "={{ 'Slack answered: ' + ($json.error || JSON.stringify($json)) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "860fce41-b3ee-505b-81fb-fecd6797c119",
+      "name": "Fail: Slack refused",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3600,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f2001ea-3333-51c9-b5a6-68b15ce79b03",
+              "name": "failure_step",
+              "value": "Schedule the post",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "0b30d2d2-05fb-5174-9bab-dd4a9ff06772",
+      "name": "Fail: scheduling",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4320,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4455c63e-10bd-5b60-bfb3-7451255fa050",
+              "name": "failure_step",
+              "value": "Update tracker in Notion (post IS scheduled)",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "fddef22b-d5f2-5d0b-8acf-055ca2f1ac4d",
+      "name": "Fail: tracker after scheduling",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0ecf997-2f91-5c77-b007-da7856bc91ca",
+              "name": "request_id",
+              "value": "={{ $('Normalize request').first().json.request_id }}",
+              "type": "string"
+            },
+            {
+              "id": "9afa3dc5-0883-5586-bee3-ecd806be9cdc",
+              "name": "client",
+              "value": "={{ $('Normalize request').first().json.client }}",
+              "type": "string"
+            },
+            {
+              "id": "adb967af-51e8-5117-86cb-edc6e3ec95d1",
+              "name": "platform",
+              "value": "={{ $('Normalize request').first().json.platform }}",
+              "type": "string"
+            },
+            {
+              "id": "b362a5e1-dc42-5399-b147-cf9a5f9f0f52",
+              "name": "execution_url",
+              "value": "={{ ($env.WEBHOOK_URL || 'http://localhost:5678/') + 'workflow/' + $workflow.id + '/executions/' + $execution.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d04b7d3d-b5bb-55fd-9529-be3209cafbca",
+      "name": "Failure details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "27b09a72-34f8-5974-932b-62549b98da19",
+              "leftValue": "={{ $('Save tracker page id').isExecuted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "7a79b68d-76d0-5129-8137-3c5c88f5e08d",
+      "name": "Has a tracker page?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2880,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NOTION_API_BASE }}/pages/{{ $('Save tracker page id').first().json.notion_page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: { 'Status': { select: { name: 'Failed' } }, 'Notes': { rich_text: [{ text: { content: String($('Failure details').first().json.failure_step + ': ' + $('Failure details').first().json.failure_detail).slice(0, 1900) } }] } } }) }}",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "326d3b2c-1c90-5062-9d22-b013c6593e74",
+      "name": "Notion: mark Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        940
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_ALERT_CHANNEL, text: '🚨 *Content pipeline failed* at: ' + $('Failure details').first().json.failure_step + '\\nRequest ' + $('Failure details').first().json.request_id + ' · ' + $('Failure details').first().json.client + ' · ' + $('Failure details').first().json.platform + '\\nDetail: ' + $('Failure details').first().json.failure_detail + '\\n<' + $('Failure details').first().json.execution_url + '|Open the execution in n8n>' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "49bc5923-6fe4-5ceb-b1a9-88291e30a15b",
+      "name": "Slack: alert ops",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        1000
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "errorMessage": "=[handled] {{ $('Failure details').first().json.failure_step }}: {{ $('Failure details').first().json.failure_detail }} ({{ $('Failure details').first().json.request_id }})"
+      },
+      "id": "d296c046-5def-5a02-8e8e-22c1cae6e44e",
+      "name": "Mark the execution as failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Intake\nTwo doors in: a form for account managers, and the API intake workflow (validates the request, answers 202 or 400, then calls this one). Both become the same normalized request.",
+        "height": 220,
+        "width": 500,
+        "color": 4
+      },
+      "id": "308cb92d-d720-565e-9992-4e8486cba1ea",
+      "name": "Note intake",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Tracker, client profile, AI draft\nEvery request gets a Notion page first (with its priority), so nothing is lost. Then the client's profile (brand voice, words to avoid, hashtags, account manager) comes from the Notion Clients database; if it can't be read, the draft is written from the request alone. The model must return JSON; if it doesn't, it gets one more try. Brand checks: length per platform, hashtags, words to avoid, the client's hashtags.",
+        "height": 220,
+        "width": 2380,
+        "color": 5
+      },
+      "id": "e586eac2-0d31-5ced-a94a-063a7bb5308a",
+      "name": "Note draft",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        420,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Human review\nThe draft and the checks go to #content-review with a link to the review form. The execution waits (no polling) until someone approves, asks for changes (loops back to the AI with the feedback, up to MAX_REVISIONS) or rejects. No answer in time -> the account manager is asked to step in.",
+        "height": 220,
+        "width": 1200,
+        "color": 6
+      },
+      "id": "cc20c2a4-3988-5b4a-9649-14627ef50d30",
+      "name": "Note review",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2820,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Schedule + close the loop\nApproved posts go to the scheduling tool; the tracker and Slack are updated with the post ID and who approved it.",
+        "height": 200,
+        "width": 980,
+        "color": 4
+      },
+      "id": "918793f6-4adc-520f-b52f-739f3767c840",
+      "name": "Note schedule",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4020,
+        -330
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Failures\nEvery external call retries (3 tries). If a step still fails, the request is marked Failed in Notion, #ops-alerts gets the step, the error and a link to the execution, and the execution is marked failed. The separate Error workflow catches anything unexpected; it skips errors already alerted here ('[handled]').",
+        "height": 200,
+        "width": 1150,
+        "color": 3
+      },
+      "id": "61e70950-aa4e-59c6-b200-45d8caebc296",
+      "name": "Note failures",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2580,
+        1180
+      ]
+    }
+  ],
+  "connections": {
+    "New content request (form)": {
+      "main": [
+        [
+          {
+            "node": "Normalize request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by the API intake": {
+      "main": [
+        [
+          {
+            "node": "Normalize request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize request": {
+      "main": [
+        [
+          {
+            "node": "Notion: create tracker page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: create tracker page": {
+      "main": [
+        [
+          {
+            "node": "Save tracker page id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: tracker page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save tracker page id": {
+      "main": [
+        [
+          {
+            "node": "Notion: look up the client profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: look up the client profile": {
+      "main": [
+        [
+          {
+            "node": "Apply client profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply client profile": {
+      "main": [
+        [
+          {
+            "node": "Draft state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft state": {
+      "main": [
+        [
+          {
+            "node": "LLM: write the draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: write the draft": {
+      "main": [
+        [
+          {
+            "node": "Parse the draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: AI draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse the draft": {
+      "main": [
+        [
+          {
+            "node": "Draft has caption and hashtags?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "One more try for valid JSON?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft has caption and hashtags?": {
+      "main": [
+        [
+          {
+            "node": "Run brand checks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "One more try for valid JSON?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One more try for valid JSON?": {
+      "main": [
+        [
+          {
+            "node": "Ask again for valid JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: no valid draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask again for valid JSON": {
+      "main": [
+        [
+          {
+            "node": "Draft state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run brand checks": {
+      "main": [
+        [
+          {
+            "node": "Summarize brand checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize brand checks": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark In review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark In review": {
+      "main": [
+        [
+          {
+            "node": "Slack: send draft for review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: tracker update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: send draft for review": {
+      "main": [
+        [
+          {
+            "node": "Slack accepted it?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Slack unreachable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack accepted it?": {
+      "main": [
+        [
+          {
+            "node": "Wait for the review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Slack refused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for the review": {
+      "main": [
+        [
+          {
+            "node": "Route the decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route the decision": {
+      "main": [
+        [
+          {
+            "node": "Publisher: schedule the post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Revisions left?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion: mark Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No review in time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publisher: schedule the post": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: scheduling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark Scheduled": {
+      "main": [
+        [
+          {
+            "node": "Slack: confirm it is scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: tracker after scheduling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revisions left?": {
+      "main": [
+        [
+          {
+            "node": "Apply reviewer feedback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Too many revisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply reviewer feedback": {
+      "main": [
+        [
+          {
+            "node": "Draft state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Too many revisions": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark Needs attention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No review in time": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark Needs attention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark Needs attention": {
+      "main": [
+        [
+          {
+            "node": "Slack: ask the account manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark Rejected": {
+      "main": [
+        [
+          {
+            "node": "Slack: note the rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: tracker page": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: AI draft": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: no valid draft": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: tracker update": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Slack unreachable": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Slack refused": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: scheduling": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: tracker after scheduling": {
+      "main": [
+        [
+          {
+            "node": "Failure details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failure details": {
+      "main": [
+        [
+          {
+            "node": "Has a tracker page?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a tracker page?": {
+      "main": [
+        [
+          {
+            "node": "Notion: mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: alert ops",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: mark Failed": {
+      "main": [
+        [
+          {
+            "node": "Slack: alert ops",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: alert ops": {
+      "main": [
+        [
+          {
+            "node": "Mark the execution as failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "cpErrorHandler01",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "timezone": "America/Toronto"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

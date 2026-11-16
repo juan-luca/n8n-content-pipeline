@@ -1,0 +1,48 @@
+# Local stack: n8n + the mock services. Everything the workflow needs is
+# configured through environment variables, so pointing it at the real Slack,
+# Notion and LLM APIs means changing .env, not the workflow.
+services:
+  n8n:
+    image: n8nio/n8n:${N8N_VERSION:-2.47.7}
+    restart: unless-stopped
+    ports:
+      - "${N8N_HOST_PORT:-5678}:5678"
+    environment:
+      GENERIC_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      TZ: ${TIMEZONE:-America/Toronto}
+      WEBHOOK_URL: ${N8N_PUBLIC_URL:-http://localhost:5678/}
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # The workflow reads its service URLs and limits from the variables below.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://mock:8080/llm/v1}
+      LLM_MODEL: ${LLM_MODEL:-mock-model}
+      SLACK_API_BASE: ${SLACK_API_BASE:-http://mock:8080/slack/api}
+      SLACK_REVIEW_CHANNEL: ${SLACK_REVIEW_CHANNEL:-content-review}
+      SLACK_ALERT_CHANNEL: ${SLACK_ALERT_CHANNEL:-ops-alerts}
+      SLACK_DIGEST_CHANNEL: ${SLACK_DIGEST_CHANNEL:-content-team}
+      NOTION_API_BASE: ${NOTION_API_BASE:-http://mock:8080/notion/v1}
+      NOTION_DATABASE_ID: ${NOTION_DATABASE_ID:-demo-content-tracker}
+      NOTION_CLIENTS_DATABASE_ID: ${NOTION_CLIENTS_DATABASE_ID:-demo-clients}
+      PUBLISHER_API_BASE: ${PUBLISHER_API_BASE:-http://mock:8080/publisher/v1}
+      APPROVAL_TIMEOUT_MINUTES: ${APPROVAL_TIMEOUT_MINUTES:-2880}
+      MAX_REVISIONS: ${MAX_REVISIONS:-2}
+      URGENT_WITHIN_DAYS: ${URGENT_WITHIN_DAYS:-2}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+    depends_on:
+      - mock
+
+  mock:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command: ["python", "-u", "/app/server.py"]
+    ports:
+      - "${MOCK_HOST_PORT:-8080}:8080"
+    volumes:
+      - ./mock:/app:ro
+
+volumes:
+  n8n_data:

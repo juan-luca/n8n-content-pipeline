@@ -1,0 +1,517 @@
+{
+  "id": "cpOpsDigest00001",
+  "name": "Content pipeline: daily digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "b333005f-c495-56df-b1cf-36b2507ad2f5",
+      "name": "Every weekday at 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-digest",
+        "options": {}
+      },
+      "id": "aa387bf8-f807-56de-a441-52b61db621d9",
+      "name": "POST /webhook/ops-digest (on demand)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        420
+      ],
+      "webhookId": "ba5308bb-3653-5524-864a-868d5839741a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTION_API_BASE }}/databases/{{ $env.NOTION_DATABASE_ID }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filter: { property: 'Status', select: { does_not_equal: 'Rejected' } }, page_size: 100 }) }}",
+        "options": {
+          "timeout": 30000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "start_cursor",
+                    "value": "={{ $response.body.next_cursor }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.has_more }}",
+              "limitPagesFetched": true,
+              "maxRequests": 50
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        }
+      },
+      "id": "77edc9b0-2878-54ed-becd-2c287df5f98d",
+      "name": "Notion: read the tracker (every page)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredNotion0001",
+          "name": "Notion integration token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify((() => {\n  const text = (p) => ((p && (p.title || p.rich_text)) || []).map((t) => t.plain_text ?? (t.text && t.text.content) ?? '').join('');\n  const pick = (p) => (p && p.select && p.select.name) || '';\n  const day = (p) => (p && p.date && p.date.start) || '';\n  const pages = $input.all().flatMap((item) => item.json.results || []);\n  return { requests: pages.map((p) => ({\n    url: p.url, request_id: text(p.properties['Request ID']), client: text(p.properties['Client']),\n    platform: pick(p.properties['Platform']), status: pick(p.properties['Status']), priority: pick(p.properties['Priority']),\n    publish_date: day(p.properties['Publish date']), review_requested: day(p.properties['Review requested']),\n    requested_by: text(p.properties['Requested by']), notes: text(p.properties['Notes'])\n  })) };\n})()) }}",
+        "options": {}
+      },
+      "id": "f1dbbefb-57ae-59d6-8538-d94a7b901e9f",
+      "name": "Collect the requests",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        200
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify((() => {\n  const today = $now.startOf('day');\n  const soon = Number($env.URGENT_WITHIN_DAYS) || 2;\n  const daysTo = (d) => d ? Math.round(DateTime.fromISO(d).startOf('day').diff(today, 'days').days) : null;\n  const when = (n) => n === null ? 'no publish date' : n === -1 ? '1 day late' : n < 0 ? (-n) + ' days late' : n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days';\n  const waited = (iso) => iso ? Math.max(0, Math.round($now.diff(DateTime.fromISO(iso), 'hours').hours)) + ' h' : 'unknown time';\n  const ref = (r) => r.url ? '<' + r.url + '|' + r.request_id + '>' : r.request_id;\n  const head = (r) => '• ' + r.client + ' · ' + r.platform + ' · ';\n  const open = ['Drafting', 'In review', 'Needs attention', 'Failed'];\n  const all = $json.requests.map((r) => Object.assign({}, r, { days: daysTo(r.publish_date) }));\n  const urgent = all.filter((r) => open.includes(r.status) && r.days !== null && r.days <= soon).sort((a, b) => a.days - b.days);\n  const rest = all.filter((r) => !urgent.includes(r));\n  const review = rest.filter((r) => r.status === 'In review').sort((a, b) => String(a.review_requested).localeCompare(String(b.review_requested)));\n  const attention = rest.filter((r) => r.status === 'Needs attention');\n  const failed = rest.filter((r) => r.status === 'Failed');\n  const week = all.filter((r) => r.status === 'Scheduled' && r.days !== null && r.days >= 0 && r.days <= 7);\n  const section = (title, items, line) => items.length ? [title + ' (' + items.length + ')'].concat(items.map(line)).join('\\n') : '';\n  const pending = urgent.length + review.length + attention.length + failed.length;\n  const parts = [\n    '*Content digest* · ' + $now.toFormat('cccc d LLLL'),\n    section('🔥 *Publishing soon, not scheduled yet*', urgent, (r) => head(r) + 'publishes ' + when(r.days) + ' · ' + r.status + (r.status === 'In review' ? ' for ' + waited(r.review_requested) : '') + ' · ' + r.requested_by + ' · ' + ref(r)),\n    section('👀 *Waiting for review*', review, (r) => head(r) + 'waiting ' + waited(r.review_requested) + ' · publishes ' + when(r.days) + ' · ' + ref(r)),\n    section('🙋 *Needs a person*', attention, (r) => head(r) + (r.notes || 'no reason given') + ' · ' + r.requested_by + ' · ' + ref(r)),\n    section('🚨 *Failed*', failed, (r) => head(r) + (r.notes || 'no detail') + ' · ' + ref(r)),\n    pending ? '' : 'Nothing is waiting on anyone. 🎉',\n    '✅ Scheduled for the next 7 days: ' + week.length\n  ].filter((p) => p);\n  return { text: parts.join('\\n\\n'), counts: { urgent: urgent.length, review: review.length, attention: attention.length, failed: failed.length, scheduled_next_7_days: week.length } };\n})()) }}",
+        "options": {}
+      },
+      "id": "295cd2e1-3353-5b5a-80e8-fd83d2615ac8",
+      "name": "Write the digest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_DIGEST_CHANNEL, text: $json.text }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f842cd67-75f3-5281-bcc0-f282e3400035",
+      "name": "Slack: post the digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9ffa3134-06cd-5e5b-b436-ada51ecc1873",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d7c2c70f-391f-5461-9b2d-3a43fbacc3ec",
+      "name": "Slack accepted the digest?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2c42cebf-b39a-5685-a57d-38f880a9df66",
+      "name": "Digest posted",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6c9a1ca0-1a61-5467-ba08-0535528170a7",
+              "name": "failure_step",
+              "value": "Read the tracker in Notion",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "08d592ee-a9c6-508d-97fa-7b948b358a4b",
+      "name": "Fail: read the tracker",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8cc49cc2-5ee1-57f0-a8bd-b6f9ccdfdbe7",
+              "name": "failure_step",
+              "value": "Post the digest to Slack",
+              "type": "string"
+            },
+            {
+              "id": "edb60c34-7982-5aae-a2f2-262ed57c5d0c",
+              "name": "failure_detail",
+              "value": "={{ (() => { const m = String($json.error?.message ?? $json.error ?? 'unknown error'); const hit = m.match(/^(\\d{3}) - (.*)$/s); if (!hit) return m.slice(0, 300); let raw = hit[2]; try { if (raw.startsWith('\"')) raw = JSON.parse(raw); } catch (e) { raw = raw.slice(1, -1); } let detail = raw; try { const body = JSON.parse(raw); detail = body.error?.message || body.message || body.error || JSON.stringify(body); } catch (e) {} return ('HTTP ' + hit[1] + ': ' + detail).slice(0, 300); })() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "7862b199-dc4d-50f4-ab1b-f7dbcb1228d4",
+      "name": "Fail: post the digest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8cc49cc2-5ee1-57f0-a8bd-b6f9ccdfdbe7",
+              "name": "failure_step",
+              "value": "Post the digest to Slack",
+              "type": "string"
+            },
+            {
+              "id": "732dd023-a8be-59d4-80ff-38bef462c985",
+              "name": "failure_detail",
+              "value": "={{ 'Slack answered: ' + ($json.error || JSON.stringify($json)) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "14220985-dff2-5c49-9f15-421bcc316fdc",
+      "name": "Fail: Slack refused the digest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_API_BASE }}/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ channel: $env.SLACK_ALERT_CHANNEL, text: '🚨 *Content digest failed* at: ' + $json.failure_step + '\\nDetail: ' + $json.failure_detail + '\\n<' + ($env.WEBHOOK_URL || 'http://localhost:5678/') + 'workflow/' + $workflow.id + '/executions/' + $execution.id + '|Open the execution in n8n>' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "9b2a5a8c-a8cc-5d49-8b88-8a8a2eb06efb",
+      "name": "Slack: alert ops (digest failed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        460
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cpCredSlackBot01",
+          "name": "Slack bot token"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "errorMessage": "=[handled] Content digest failed at {{ ((f) => f.failure_step + ': ' + f.failure_detail)($('Fail: read the tracker').isExecuted ? $('Fail: read the tracker').first().json : $('Fail: post the digest').isExecuted ? $('Fail: post the digest').first().json : $('Fail: Slack refused the digest').first().json) }}"
+      },
+      "id": "2413c07d-4bc4-50c4-a84f-ba9ed0aab05b",
+      "name": "Mark the digest run as failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Daily content digest\nEvery weekday at 9:00 (or on demand through the webhook), reads every request in the Notion tracker, page by page, and posts one message to the team channel: what publishes soon and is not scheduled yet, what has been waiting for review and for how long, what needs a person, and what failed. If Notion or Slack fail after 3 tries, #ops-alerts hears about it once.",
+        "height": 200,
+        "width": 1700,
+        "color": 4
+      },
+      "id": "258e3011-b503-50d2-b93d-d55c57caa065",
+      "name": "Note digest",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -60
+      ]
+    }
+  ],
+  "connections": {
+    "Every weekday at 9:00": {
+      "main": [
+        [
+          {
+            "node": "Notion: read the tracker (every page)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /webhook/ops-digest (on demand)": {
+      "main": [
+        [
+          {
+            "node": "Notion: read the tracker (every page)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion: read the tracker (every page)": {
+      "main": [
+        [
+          {
+            "node": "Collect the requests",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: read the tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect the requests": {
+      "main": [
+        [
+          {
+            "node": "Write the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write the digest": {
+      "main": [
+        [
+          {
+            "node": "Slack: post the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: post the digest": {
+      "main": [
+        [
+          {
+            "node": "Slack accepted the digest?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: post the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack accepted the digest?": {
+      "main": [
+        [
+          {
+            "node": "Digest posted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: Slack refused the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: read the tracker": {
+      "main": [
+        [
+          {
+            "node": "Slack: alert ops (digest failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: post the digest": {
+      "main": [
+        [
+          {
+            "node": "Slack: alert ops (digest failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail: Slack refused the digest": {
+      "main": [
+        [
+          {
+            "node": "Slack: alert ops (digest failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: alert ops (digest failed)": {
+      "main": [
+        [
+          {
+            "node": "Mark the digest run as failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "cpErrorHandler01",
+    "timezone": "America/Toronto"
+  },
+  "meta": {},
+  "tags": []
+}

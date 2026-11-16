@@ -1,0 +1,234 @@
+{
+  "id": "cpApiIntake00001",
+  "name": "Content pipeline: API intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "95e8410b-ad41-5449-8b31-32ca1e0a86b9",
+      "name": "POST /webhook/content-request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "b7036904-4db5-576d-94ce-6e310dc647a9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6d586da1-4f88-5381-ac20-1043b5462787",
+              "leftValue": "={{ String($json.body.client ?? '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "03366af5-eeef-5b7c-aad5-a75f2a6ca9ae",
+              "leftValue": "={{ String($json.body.brief ?? '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "786a9448-4ecb-5f6b-8217-7bde0d127dbc",
+              "leftValue": "={{ ['instagram', 'tiktok', 'facebook', 'linkedin', 'x'].includes(String($json.body.platform ?? '').trim().toLowerCase()) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "24dc09a1-5291-5391-b061-0dce0c6964fc",
+      "name": "Request complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'client, brief and a supported platform are required', platforms: ['instagram', 'tiktok', 'facebook', 'linkedin', 'x'] }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "107b3508-0b08-5cbb-8e91-9d3aa6d29089",
+      "name": "Reply 400: missing fields",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ ...$json.body, request_id: 'CR-' + $now.toFormat('yyyyMMdd') + '-' + $execution.id, source: 'api' }) }}",
+        "options": {}
+      },
+      "id": "2a32b044-97e5-5961-a976-0c46e9ffefe8",
+      "name": "Assign request ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ request_id: $json.request_id, status: 'received', next: 'AI draft, then review in Slack' }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "d9632c27-5a37-59ec-86d1-db705f7e7c39",
+      "name": "Reply 202: request accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "cpMainPipeline01",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "ec13958b-3d3f-56e5-9400-0053e22a611d",
+      "name": "Start the content pipeline",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## API intake\nFor tools that create requests automatically. Validates the body, answers right away (202 with the request ID, or 400), then hands the request to the content pipeline without waiting for it.",
+        "height": 180,
+        "width": 1200,
+        "color": 4
+      },
+      "id": "bde1be50-7553-5716-9a01-48ec1928c3c2",
+      "name": "Note api",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        40
+      ]
+    }
+  ],
+  "connections": {
+    "POST /webhook/content-request": {
+      "main": [
+        [
+          {
+            "node": "Request complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request complete?": {
+      "main": [
+        [
+          {
+            "node": "Assign request ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply 400: missing fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign request ID": {
+      "main": [
+        [
+          {
+            "node": "Reply 202: request accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply 202: request accepted": {
+      "main": [
+        [
+          {
+            "node": "Start the content pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "cpErrorHandler01"
+  },
+  "meta": {},
+  "tags": []
+}
