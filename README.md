@@ -14,6 +14,10 @@ It runs on a laptop with one command: n8n plus small local stand-ins for Slack, 
 tool. Pointing it at the real services is a matter of environment variables and credentials, not of editing the
 workflows.
 
+![From request to scheduled post (2x speed)](docs/img/demo.gif)
+
+The full walkthrough, outage and daily digest included, is a 2:40 video: [docs/demo.mp4](docs/demo.mp4).
+
 ![The pipeline in the n8n editor](docs/img/workflow.png)
 
 | Review message in Slack | Review form | Tracker |
