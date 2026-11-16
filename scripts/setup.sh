@@ -34,6 +34,8 @@ json.dump([
 ], open(sys.argv[1], "w"))
 PY
 docker compose cp "$creds" n8n:/tmp/creds.json >/dev/null
+# The copy keeps the host user's uid, and n8n runs as node: hand the file over so it can read it.
+docker compose exec -T -u root n8n chown node:node /tmp/creds.json
 docker compose exec -T n8n n8n import:credentials --input=/tmp/creds.json
 docker compose exec -T -u root n8n rm -f /tmp/creds.json
 
